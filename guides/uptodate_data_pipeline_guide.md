@@ -62,6 +62,10 @@ input/
 14. 새 일별 파일을 `input` 폴더로 복사한다.
 15. 새 일별 파일에서 주간/월간/분기/연간 집계 파일을 다시 만든다.
 16. 처리한 신규 raw 파일과 이전 uptodate 파일을 `rawdata/old`로 이동한다.
+17. `input` 최신 파일 기준으로 대시보드 HTML을 재생성한다.
+18. 변경 파일을 GitHub에 commit/push한다.
+19. GitHub Pages 배포 성공 여부를 확인한다.
+20. 공개 URL에서 최신 날짜와 기간별 마지막 라벨을 확인한다.
 
 ---
 
@@ -517,7 +521,7 @@ old/stk_optOrdProgress_20260702_051715_backup.csv
 
 - 일별 uptodate 파일이 검증된 기준 데이터입니다.
 - 집계 파일들은 모두 같은 기준에서 파생되어야 합니다.
-- 중복 날짜 무시 규칙도 일별 uptodate 파일에 이미 반영되어 있어야 합니다.
+- 최근 중복 날짜 교체 규칙도 일별 uptodate 파일에 이미 반영되어 있어야 합니다.
 
 ---
 
@@ -711,11 +715,134 @@ input/uptodate_20260702_quater.csv
 input/uptodate_20260702_year.csv
 ```
 
+### 16-3. dashboard
+
+```text
+index.html
+integrated_category_dashboard_sample.html
+input/integrated_category_dashboard_sample.html
+```
+
 ---
 
-## 17. 반드시 지켜야 할 주의점
+## 17. GitHub Pages 반영
 
-### 17-1. 최근 중복 날짜는 교체하기
+데이터 파일 생성만으로는 공개 페이지가 바뀌지 않습니다.
+
+`input` 최신 파일을 만든 뒤에는 대시보드 HTML을 다시 만들고, GitHub에 올린 뒤, Pages 배포까지 확인해야 합니다.
+
+### 17-1. 대시보드 HTML 재생성
+
+최신 `input/uptodate_YYYYMMDD_*` 파일 기준으로 HTML을 재생성합니다.
+
+```text
+python3 chart_agent/generate_dashboard_html.py
+```
+
+확인할 것:
+
+```text
+Latest input date: YYYYMMDD
+Replacement window starts: YYYYMMDD
+week/month/quarter/year 마지막 라벨
+```
+
+예:
+
+```text
+Latest input date: 20260702
+Replacement window starts: 20260602
+week: ... -> 20260629_20260705
+month: ... -> 202607
+quarter: ... -> 2026Q3
+year: ... -> 2026
+```
+
+### 17-2. 로컬 HTML 검증
+
+`index.html` 안의 표시 날짜와 데이터 마지막 라벨을 확인합니다.
+
+검증 기준:
+
+```text
+LAST_DATE가 최신 날짜와 같다.
+상단 표시 문구가 최신 날짜를 보여준다.
+주간/월간/분기/연간 마지막 라벨이 최신 날짜를 포함한다.
+```
+
+예:
+
+```text
+LAST_DATE 20260702
+데이터: 2014.06~2026.07.02
+week 마지막: 20260629_20260705
+month 마지막: 202607
+quarter 마지막: 2026Q3
+year 마지막: 2026
+```
+
+### 17-3. GitHub에 반영
+
+검증이 끝난 뒤 변경 파일을 commit/push합니다.
+
+대상 파일:
+
+```text
+rawdata/uptodate_YYYYMMDD.csv
+input/uptodate_YYYYMMDD.csv
+input/uptodate_YYYYMMDD_week.csv
+input/uptodate_YYYYMMDD_month.csv
+input/uptodate_YYYYMMDD_quater.csv
+input/uptodate_YYYYMMDD_year.csv
+index.html
+integrated_category_dashboard_sample.html
+input/integrated_category_dashboard_sample.html
+```
+
+가이드나 스크립트가 바뀐 경우에는 해당 문서와 스크립트도 함께 commit/push합니다.
+
+### 17-4. GitHub Pages 배포 확인
+
+push 후 GitHub Actions의 Pages 배포가 성공해야 공개 페이지에 반영됩니다.
+
+확인할 것:
+
+```text
+Deploy GitHub Pages workflow가 success인지 확인한다.
+실패하면 공개 페이지 확인 전에 원인을 먼저 해결한다.
+```
+
+### 17-5. 공개 페이지 최종 확인
+
+배포 성공 후 공개 URL에서 최신 데이터가 보이는지 확인합니다.
+
+공개 URL:
+
+```text
+https://nistulgrow.github.io/trend/
+```
+
+브라우저 캐시가 남을 수 있으므로 확인할 때는 새로고침하거나 URL 뒤에 확인용 값을 붙입니다.
+
+예:
+
+```text
+https://nistulgrow.github.io/trend/?v=YYYYMMDD
+```
+
+최종 확인 기준:
+
+```text
+상단 데이터 기간이 최신 날짜까지 표시된다.
+그래프의 마지막 기간이 최신 날짜를 포함한다.
+필터와 차트가 정상 동작한다.
+```
+
+---
+
+## 18. 반드시 지켜야 할 주의점
+
+### 18-1. 최근 중복 날짜는 교체하기
 
 신규 raw 파일이 기존 uptodate와 날짜가 겹치면, 최신 raw 마지막 날짜 기준 최대 한 달 전까지의 겹치는 날짜는 새 raw 값으로 교체합니다.
 
@@ -740,7 +867,7 @@ input/uptodate_20260702_year.csv
 
 최신 raw 마지막 날짜 기준 최대 한 달보다 오래된 겹침 구간은 기존 값을 그대로 둡니다.
 
-### 17-2. 행 순서 기준 병합 금지
+### 18-2. 행 순서 기준 병합 금지
 
 가장 중요한 주의점입니다.
 
@@ -759,19 +886,19 @@ input/uptodate_20260702_year.csv
 상품명 + 옵션내용이 같은 행에만 날짜값 붙이기
 ```
 
-### 17-3. 파일명만 믿지 않기
+### 18-3. 파일명만 믿지 않기
 
 파일명이 날짜를 암시하더라도 반드시 CSV 내부의 날짜 컬럼을 확인합니다.
 
 과거에 파일명과 실제 날짜 컬럼이 맞지 않는 사례가 있었습니다.
 
-### 17-4. 검증 전 파일 이동 금지
+### 18-4. 검증 전 파일 이동 금지
 
 검증이 끝나기 전에는 신규 raw 파일과 기존 uptodate 파일을 `old`로 이동하지 않습니다.
 
 검증 실패 시 원본 파일이 흩어지면 재작업이 번거로워집니다.
 
-### 17-5. 현재고/미발송수는 합산하지 않기
+### 18-5. 현재고/미발송수는 합산하지 않기
 
 `현재고`, `미발송수`는 기간 합계가 아닙니다.
 
@@ -779,25 +906,25 @@ input/uptodate_20260702_year.csv
 
 신규 raw에 없는 기존 상품/옵션은 기존 uptodate 값을 유지합니다.
 
-### 17-6. 주문수/주문금액은 비워 두기
+### 18-6. 주문수/주문금액은 비워 두기
 
 통합 파일과 집계 파일에서 `주문수`, `주문금액`은 빈칸으로 둡니다.
 
 이 컬럼에 특정 raw 파일의 합계가 남아 있으면 전체 기간 합계처럼 오해할 수 있습니다.
 
-### 17-7. 마지막 기간은 버리지 않기
+### 18-7. 마지막 기간은 버리지 않기
 
 현재 정책은 up to date 방식입니다.
 
 따라서 마지막 주/월/분기/연도가 끝나지 않았더라도, 있는 날짜까지 합산해서 포함합니다.
 
-### 17-8. old 폴더 덮어쓰기 주의
+### 18-8. old 폴더 덮어쓰기 주의
 
 `rawdata/old`에 같은 이름의 파일이 있으면 무조건 덮어쓰지 않습니다.
 
 특히 같은 파일명이지만 내용이 수정된 경우가 있을 수 있습니다.
 
-### 17-9. input 과거 파일 삭제 순서 주의
+### 18-9. input 과거 파일 삭제 순서 주의
 
 과거 `input/uptodate_*` 파일은 삭제하되, 최신 파일 생성과 검증이 끝난 뒤 정리합니다.
 
@@ -805,7 +932,15 @@ input/uptodate_20260702_year.csv
 
 ---
 
-## 18. 완료 체크리스트
+### 18-10. GitHub Pages 확인 전 완료 처리 금지
+
+GitHub에 push만 했다고 공개 페이지 반영이 끝난 것은 아닙니다.
+
+Pages 배포 성공과 공개 URL의 최신 날짜 표시까지 확인해야 완료입니다.
+
+---
+
+## 19. 완료 체크리스트
 
 작업 완료 전 아래 항목을 모두 확인합니다.
 
@@ -840,11 +975,16 @@ input/uptodate_20260702_year.csv
 [ ] 처리한 신규 raw 파일을 rawdata/old로 이동했다.
 [ ] 이전 uptodate 파일을 rawdata/old로 이동했다.
 [ ] rawdata 루트에는 최신 uptodate 파일만 남겼다.
+[ ] 대시보드 HTML을 재생성했다.
+[ ] HTML의 LAST_DATE와 상단 데이터 기간이 최신 날짜다.
+[ ] 변경 파일을 GitHub에 commit/push했다.
+[ ] GitHub Pages 배포가 성공했다.
+[ ] 공개 URL에서 최신 날짜와 차트 동작을 확인했다.
 ```
 
 ---
 
-## 19. 핵심 요약
+## 20. 핵심 요약
 
 ```text
 기준 원장은 rawdata의 최신 uptodate 파일이다.
@@ -857,4 +997,6 @@ input/uptodate_20260702_year.csv
 주문수/주문금액은 비워 둔다.
 집계 파일은 항상 검증된 일별 파일에서 만든다.
 마지막 미완성 기간도 포함한다.
+대시보드 HTML을 재생성해야 화면이 바뀐다.
+GitHub Pages 배포 성공과 공개 URL 확인까지 끝나야 완료다.
 ```
