@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>아이비 침대 월간 판매량</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; background: #0f1117; color: #e0e0e0; padding: 24px 20px; }
+  h2 { font-size: 17px; font-weight: 700; margin-bottom: 3px; color: #f5f5f5; }
+  .sub { font-size: 12px; color: #666; margin-bottom: 16px; }
+  .kpi { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+  .kpi-card { background: #1a2035; border: 1px solid #242c44; border-radius: 8px; padding: 10px 16px; flex: 1; min-width: 100px; }
+  .kpi-label { font-size: 11px; color: #666; margin-bottom: 3px; }
+  .kpi-val { font-size: 18px; font-weight: 700; }
+  .tabs { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; align-items: center; }
+  .tab { padding: 5px 13px; border-radius: 20px; border: 1px solid #2e3448; background: transparent; color: #888; font-size: 12px; cursor: pointer; transition: all .15s; }
+  .tab.on { background: #1e2d4a; border-color: #3b82f6; color: #93c5fd; }
+  .sep { width: 1px; height: 20px; background: #2a2a3a; margin: 0 2px; }
+  .chart-box { background: #13182a; border: 1px solid #1e2438; border-radius: 12px; padding: 18px 16px 12px; }
+  .note { font-size: 11px; color: #555; margin-top: 10px; line-height: 1.7; }
+  .note b { color: #777; }
+</style>
+</head>
+<body>
+<h2>아이비 침대 월간 판매 대수</h2>
+<div class="sub">2023.12 ~ 2026.05 · 박스1·박스2 수량 중 작은 값(min) 기준 실판매 대수</div>
+
+<div class="kpi" id="kpiArea">
+  <div class="kpi-card">
+    <div class="kpi-label">전체 합계</div>
+    <div class="kpi-val" style="color:#60a5fa">2,756대</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">자체배송 (수도권)</div>
+    <div class="kpi-val" style="color:#3b82f6">1,901대 (69.0%)</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">현대물류 (지방)</div>
+    <div class="kpi-val" style="color:#10b981">470대 (17.1%)</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">에바다 (지방)</div>
+    <div class="kpi-val" style="color:#f59e0b">385대 (14.0%)</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">최다 판매월</div>
+    <div class="kpi-val" style="color:#f472b6">2025.05 (172대)</div>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tab on" onclick="setView('total')">전체 합산</button>
+  <div class="sep"></div>
+  <button class="tab" onclick="setView('channel')">배송사별</button>
+  <button class="tab" onclick="setView('size')">사이즈별 SS/ES</button>
+  <button class="tab" onclick="setView('color')">색상별</button>
+  <div class="sep"></div>
+  <button class="tab" onclick="setView('stacked_channel')">누적-배송사</button>
+  <button class="tab" onclick="setView('stacked_color')">누적-색상</button>
+</div>
+
+<div class="chart-box">
+  <canvas id="chart" height="300"></canvas>
+</div>
+
+<div class="note">
+  <b>대수 산정:</b> 아이비 침대 1대 = 박스1·박스2 수량 중 작은 값(min). 박스3(통판, 캠퍼·헤이하이 공용)은 제외.<br>
+  <b>색상 뷰:</b> ES는 화이트 단일색상이라 색상 비교에서 제외 (사이즈별 뷰에서 확인).<br>
+  <b>제외 항목:</b> 범퍼가드, 펠트도어, AS용, 모듈변경, B급, 통판 1세트/1ea.<br>
+  <b>데이터 기간:</b> 옵션명에 박스 번호(1/2/3)가 표기된 통판트레이버전 이후 데이터만 집계됨.
+</div>
+
+<script>
+// ① 데이터 정의
+const months = ["202312", "202401", "202402", "202403", "202404", "202405", "202406", "202407", "202408", "202409", "202410", "202411", "202412", "202501", "202502", "202503", "202504", "202505", "202506", "202507", "202508", "202509", "202510", "202511", "202512", "202601", "202602", "202603", "202604", "202605"];
+const labels = months.map(m => m.slice(0,4)+'.'+m.slice(4));
+
+// ② 시리즈 데이터 (대수 기준)
+const wh = [10, 20, 25, 30, 87, 52, 53, 74, 66, 93, 86, 51, 74, 111, 158, 84, 75, 122, 63, 75, 3, 1, 1, 1, 0, 0, 0, 0, 0, 0];   // SS 화이트(구형)
+const sw = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16, 79, 124, 121, 106, 125, 95, 73, 104, 102, 164];   // SS 소프트화이트
+const lb = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 40, 28, 29, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0];   // SS 라떼베이지
+const es = [0, 0, 0, 0, 0, 0, 2, 9, 7, 6, 11, 6, 8, 7, 8, 5, 1, 10, 6, 5, 2, 4, 5, 5, 4, 5, 9, 3, 1, 4];   // ES
+const jj = [8, 16, 20, 26, 64, 35, 36, 54, 44, 66, 61, 41, 50, 78, 107, 61, 45, 129, 51, 81, 64, 80, 80, 75, 105, 81, 64, 82, 66, 131];   // 자체배송
+const hd = [1, 1, 2, 2, 15, 7, 8, 19, 18, 14, 24, 7, 22, 16, 28, 15, 15, 21, 36, 23, 10, 29, 20, 25, 14, 11, 14, 15, 24, 14];   // 현대물류
+const eb = [1, 3, 3, 2, 8, 10, 11, 10, 11, 19, 12, 9, 10, 24, 31, 14, 16, 22, 10, 21, 10, 21, 27, 12, 10, 8, 4, 10, 13, 23];   // 에바다
+
+const ss    = months.map((_,i) => wh[i]+sw[i]+lb[i]);
+const total = months.map((_,i) => wh[i]+sw[i]+lb[i]+es[i]);
+
+// ③ 유틸 함수
+function sum(a) { return a.reduce((s,v)=>s+v,0); }
+function movAvg(arr, n=3) {
+  return arr.map((_,i) => {
+    const s = arr.slice(Math.max(0,i-n+1), i+1);
+    return Math.round(s.reduce((a,b)=>a+b,0)/s.length);
+  });
+}
+
+// ④ views 정의
+const views = {
+  total: {
+    datasets: [
+      { label: '전체 합산', data: total, borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.10)', fill: true, tension: 0.3, borderWidth: 2.5, pointRadius: 4, pointHoverRadius: 7 },
+      { label: '3개월 이동평균', data: movAvg(total,3), borderColor: '#f472b6', backgroundColor: 'transparent', fill: false, tension: 0.4, borderWidth: 1.5, pointRadius: 0, borderDash: [5,3] },
+    ]
+  },
+  channel: {
+    datasets: [
+      { label: '자체배송 (수도권)', data: jj, borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.08)', fill: true, tension: 0.3, borderWidth: 2, pointRadius: 3, pointHoverRadius: 6 },
+      { label: '현대물류 (지방)', data: hd, borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.08)', fill: true, tension: 0.3, borderWidth: 2, pointRadius: 3, pointHoverRadius: 6 },
+      { label: '에바다 (지방)', data: eb, borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.08)', fill: true, tension: 0.3, borderWidth: 2, pointRadius: 3, pointHoverRadius: 6 },
+    ]
+  },
+  size: {
+    datasets: [
+      { label: 'SS (슈퍼싱글)', data: ss, borderColor: '#a78bfa', backgroundColor: 'rgba(167,139,250,0.08)', fill: true, tension: 0.3, borderWidth: 2, pointRadius: 3, pointHoverRadius: 6 },
+      { label: 'ES', data: es, borderColor: '#fb7185', backgroundColor: 'rgba(251,113,133,0.08)', fill: true, tension: 0.3, borderWidth: 2, pointRadius: 3, pointHoverRadius: 6 },
+    ]
+  },
+  color: {
+    datasets: [
+      { label: 'SS 화이트(구형)', data: wh, borderColor: '#94a3b8', backgroundColor: 'rgba(148,163,184,0.08)', fill: true, tension: 0.3, borderWidth: 2, pointRadius: 3, pointHoverRadius: 6 },
+      { label: 'SS 소프트화이트', data: sw, borderColor: '#bae6fd', backgroundColor: 'rgba(186,230,253,0.08)', fill: true, tension: 0.3, borderWidth: 2, pointRadius: 3, pointHoverRadius: 6 },
+      { label: 'SS 라떼베이지', data: lb, borderColor: '#d4a574', backgroundColor: 'rgba(212,165,116,0.08)', fill: true, tension: 0.3, borderWidth: 2, pointRadius: 3, pointHoverRadius: 6 },
+    ]
+  },
+  stacked_channel: {
+    datasets: [
+      { label: '자체배송 (수도권)', data: jj, backgroundColor: '#3b82f6bb', stack: 's' },
+      { label: '현대물류 (지방)', data: hd, backgroundColor: '#10b981bb', stack: 's' },
+      { label: '에바다 (지방)', data: eb, backgroundColor: '#f59e0bbb', stack: 's' },
+    ]
+  },
+  stacked_color: {
+    datasets: [
+      { label: 'SS 화이트(구형)', data: wh, backgroundColor: '#64748bbb', stack: 's' },
+      { label: 'SS 소프트화이트', data: sw, backgroundColor: '#7dd3fcbb', stack: 's' },
+      { label: 'SS 라떼베이지', data: lb, backgroundColor: '#d4a574bb', stack: 's' },
+    ]
+  },
+};
+
+// ⑤ 공통 옵션
+function makeOpts(stacked = false) {
+  return {
+    responsive: true,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: {
+        labels: { color: '#aaa', font: { size: 11 }, boxWidth: 10, padding: 12 }
+      },
+      tooltip: {
+        backgroundColor: '#1a2035',
+        borderColor: '#2e3a5c',
+        borderWidth: 1,
+        titleColor: '#e0e0e0',
+        bodyColor: '#bbb',
+        padding: 10,
+        callbacks: {
+          afterBody: items => {
+            const s = items
+              .filter(i => !i.dataset.borderDash)
+              .reduce((a, i) => a + i.raw, 0);
+            return items.length > 1 ? ['', '합계: ' + s.toLocaleString() + '대'] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: {
+        stacked,
+        ticks: { color: '#555', font: { size: 11 }, maxRotation: 45, autoSkip: true, maxTicksLimit: 20 },
+        grid: { color: '#1a1f2e' }
+      },
+      y: {
+        stacked,
+        beginAtZero: true,
+        ticks: { color: '#666', font: { size: 11 } },
+        grid: { color: '#1a1f2e' },
+        title: { display: true, text: '판매 대수 (대/월)', color: '#555', font: { size: 11 } }
+      }
+    }
+  };
+}
+
+// ⑥ 차트 생성 / 전환
+const tabKeys = ['total', 'channel', 'size', 'color', 'stacked_channel', 'stacked_color'];
+let chart = new Chart(document.getElementById('chart'), {
+  type: 'line',
+  data: { labels, datasets: views.total.datasets },
+  options: makeOpts(false)
+});
+
+function setView(v) {
+  document.querySelectorAll('.tab').forEach((t, i) =>
+    t.classList.toggle('on', tabKeys[i] === v)
+  );
+  chart.destroy();
+  const isStacked = v.startsWith('stacked');
+  chart = new Chart(document.getElementById('chart'), {
+    type: isStacked ? 'bar' : 'line',
+    data: { labels, datasets: views[v].datasets },
+    options: makeOpts(isStacked)
+  });
+}
+</script>
+</body>
+</html>
