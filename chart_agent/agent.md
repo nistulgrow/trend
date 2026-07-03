@@ -223,6 +223,14 @@ desk_oak_est
 
 `guides/sales_dashboard_data_spec.md`를 기준으로 HTML 안에 넣을 `DATA` 객체를 생성합니다.
 
+현재 이 단계는 아래 스크립트로 실행합니다.
+
+```text
+python3 chart_agent/generate_dashboard_html.py
+```
+
+이 스크립트는 기존 HTML의 `LAST_DATE`까지 끝난 기간의 검증된 `DATA` 값은 보존하고, 최신 `input/uptodate_YYYYMMDD_*` 집계 파일에서 기존 마지막 날짜 이후에 걸치는 기간만 다시 계산해 붙입니다.
+
 기간 단위:
 
 ```text
