@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """Regenerate dashboard HTML from the latest input uptodate files.
 
-The existing dashboard DATA is treated as the source of truth for periods that
-ended on or before its LAST_DATE. New or partially extended periods are
-calculated from the latest input CSVs and spliced in. This prevents older,
-already-reviewed figures from shifting when the counting rules are refined.
+The latest raw update may replace recent historical dates to reflect canceled
+or changed orders. The dashboard therefore preserves only periods that end
+before the replacement window and recalculates every period that overlaps it.
 """
 
 from __future__ import annotations
@@ -115,6 +114,20 @@ def natural_end(label: str) -> str:
         days = [31, 29 if year % 4 == 0 and (year % 100 != 0 or year % 400 == 0) else 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
         return f"{year:04d}{month:02d}{days[month - 1]:02d}"
     return label + "1231"
+
+
+def replacement_start(last_date: str) -> str:
+    """Return the first date in the maximum one-month replacement window."""
+    year = int(last_date[:4])
+    month = int(last_date[4:6])
+    day = int(last_date[6:8])
+    month -= 1
+    if month == 0:
+        year -= 1
+        month = 12
+    days = [31, 29 if year % 4 == 0 and (year % 100 != 0 or year % 400 == 0) else 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+    day = min(day, days[month - 1])
+    return f"{year:04d}{month:02d}{day:02d}"
 
 
 def zero(n: int) -> list[int]:
@@ -366,7 +379,7 @@ def compute_file(path: Path) -> dict[str, dict]:
     return output
 
 
-def splice_data(base: dict, calculated: dict, base_last: str) -> dict:
+def splice_data(base: dict, calculated: dict, keep_before: str) -> dict:
     merged = {}
     for period, period_data in calculated.items():
         merged[period] = {}
@@ -380,7 +393,7 @@ def splice_data(base: dict, calculated: dict, base_last: str) -> dict:
                 calc_values = ship_data["series"].get(key, zero(len(labels)))
                 base_values = base.get(period, {}).get(ship, {}).get("series", {}).get(key, [])
                 for i, label in enumerate(labels):
-                    if natural_end(label) <= base_last and label in base_index:
+                    if natural_end(label) < keep_before and label in base_index:
                         values_out.append(base_values[base_index[label]])
                     else:
                         values_out.append(calc_values[i])
@@ -427,13 +440,15 @@ def update_html(path: Path, data: dict, last_date: str) -> None:
 def main() -> None:
     latest = latest_input_date()
     base_data, base_last = read_base(ROOT / "index.html")
+    replace_from = replacement_start(latest)
     calculated = {period: compute_file(path) for period, path in period_files(latest).items()}
-    data = splice_data(base_data, calculated, base_last)
+    data = splice_data(base_data, calculated, replace_from)
     for path in HTML_FILES:
         if path.exists():
             update_html(path, data, latest)
     print(f"Base LAST_DATE: {base_last}")
     print(f"Latest input date: {latest}")
+    print(f"Replacement window starts: {replace_from}")
     for period in ("week", "month", "quarter", "year"):
         labels = data[period]["all"]["labels"]
         print(f"{period}: {labels[0]} -> {labels[-1]} ({len(labels)})")
